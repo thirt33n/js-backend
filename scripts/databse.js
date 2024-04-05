@@ -13,8 +13,31 @@ conn.connect((err)=>{
         return;
     }
     else{
-        console.log("Successguly connected to the mysql server");
+        console.log("Successfuly connected to the mysql server");
     }
 })
+
+const account_table_creation =`
+CREATE TABLE IF NOT EXISTS account (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    currency VARCHAR(255) NOT NULL,
+    balance DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES user(id)
+)
+
+`;
+
+conn.query(account_table_creation,(err,result)=>{
+    if(err)
+    {
+        console.log("Error encountered: ",err);
+        return;
+    }
+    console.log("Table Created succesfuly");
+
+});
+
+
 
 module.exports = conn
