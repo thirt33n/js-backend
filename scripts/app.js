@@ -102,9 +102,7 @@ app.post('/wallet/deposit',(req,res)=>{
 app.post('/wallet/withdraw',(req,res)=>{
 
     const {user_id,currency,amount} = req.body;
-    // console.log(amount);
-    // console.log(typeof(amount));
-    // const parseAmt = parseFloat(amount);
+    
     const fetch_cur_balance = "SELECT BALANCE FROM ACCOUNT WHERE USER_ID = ?";
 
     conn.query(fetch_cur_balance,[user_id],(err,result)=>{
@@ -112,10 +110,11 @@ app.post('/wallet/withdraw',(req,res)=>{
         if(err){ console.log("Not Found Error: ",err); res.status(500).json({message:"NOT FOUND"}); return;};
 
         console.log(result);
+
         if(result.length == 0)
         {
             console.log("NOTHING TO WITHDRAW FROM!",err);
-            res.status(500).json({message:"Nothing in the account to withdrawfrom"});
+            res.status(500).json({message:"Nothing in the account to withdraw From"});
             return;
         }
         else{
@@ -173,7 +172,7 @@ app.post('/wallet/withdraw',(req,res)=>{
 app.post("/order/create", (req, res) => {
     
     const { user_id, side, price, volume, buyCur, sellCur } = req.body;
-    // res.status(200).json({ user: user_id, side: side, price: price, volume: volume, currency_buy: buyCur, currency_sell: sellCur });
+    
 
 
     const order_insertion = "INSERT INTO ORDERS (user_id,side,price,volume,buyCur,sellCur) VALUES (?,?,?,?,?,?)";
@@ -229,6 +228,83 @@ app.put("/order/cancel",(req,res)=>{
 
     })
 })
+
+
+//ADMIN APIS
+
+//GET the values api
+
+//Success checking api:
+
+app.post("/admin/approve",(req,res)=>{
+
+    const {order_id} = req.body;
+
+    fetch_order_details = "SELECT * FROM ORDERS WHERE ORDER_ID = ?";
+
+    
+
+    conn.query(fetch_order_details,[order_id],(err,result)=>{
+        if(err)
+        {
+            console.log("Unable to retrieve order detials",err);
+            res.status(500).json({status:"Fail",message:"Unable to fetch order details"});
+            return;
+        }
+        // console.log(result);
+        user_id = result[0].user_id;
+    
+        side  = result[0].side;
+        price = result[0].price;
+        vol = result[0].volume;
+        buyCur = result[0].buyCur;
+
+        if(side == "buy")
+        {
+            const check_balance_query = "SELECT BALANCE FROM ACCOUNT WHERE USER_ID = ?";
+            conn.query(check_balance_query,[user_id],(err,bal_res)=>{
+                if(err)
+                {
+                    console.log("Error",err);
+                    // res.status(500).json({message:"Error"})
+                    return;
+                }
+                const curBal = bal_res[0].BALANCE;
+
+                if(curBal>price) //Checking if the person has the balance to buy the volume
+                {
+                        const wallet_update = `INSERT INTO WALLET (user_id,${buyCur}) VALUES (?,?) ON DUPLICATE KEY UPDATE ${buyCur} = ${buyCur}+?`;
+                        conn.query(wallet_update,[user_id,vol,vol],(err,wal_up)=>{
+                            if(err)
+                            {
+                                console.log("Unable to update wallet",err);
+                                res.status(500).json({status:"fail",message:"Unable to credit crypto"});
+                                return;
+                            }
+
+                            console.log("Wallet Updated");
+                            res.status(200).json({status:"Success",mesage:"Successfuly Added Crypto to wallet"});
+                            
+                        })
+                }
+
+                if(curBal<price)
+                {
+                    console.log("Insufficient funds");
+                    res.status(403).json({status:"fail",message:"You have insufficient funds for this purchase"});
+                    return;
+                }
+            })
+        }
+
+
+
+    })
+    // console.log(user_id);
+    
+
+})
+
 
 app.listen(9090,()=>{
     console.log("Test");
