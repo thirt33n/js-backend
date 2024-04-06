@@ -54,6 +54,7 @@ app.post('/wallet/deposit',(req,res)=>{
         
         if(err){ console.log("Not Found Error: ",err); res.status(500).json({message:"NOT FOUND"}); return;};
 
+        console.log(result);
         if(result.length == 0)
         {
             const new_account_setup = "INSERT INTO ACCOUNT (USER_ID,CURRENCY,BALANCE) VALUES (?,?,?);";
@@ -73,7 +74,7 @@ app.post('/wallet/deposit',(req,res)=>{
             })
         }
         else{
-            const CurBal = result[0].balance;
+            const CurBal = result[0].BALANCE;
             const newBal = amount+CurBal;
 
             const updater = "UPDATE ACCOUNT SET BALANCE = ? WHERE USER_ID = ?";
@@ -110,6 +111,7 @@ app.post('/wallet/withdraw',(req,res)=>{
         
         if(err){ console.log("Not Found Error: ",err); res.status(500).json({message:"NOT FOUND"}); return;};
 
+        console.log(result);
         if(result.length == 0)
         {
             console.log("NOTHING TO WITHDRAW FROM!",err);
@@ -118,7 +120,7 @@ app.post('/wallet/withdraw',(req,res)=>{
         }
         else{
             console.log(result);
-            const CurBal = result[0].balance;
+            const CurBal = result[0].BALANCE;
             console.log(CurBal);
             if(CurBal == 0.00)
             {
@@ -159,6 +161,74 @@ app.post('/wallet/withdraw',(req,res)=>{
     // 
 })
 
+
+
+//FETCH Balance from account andbtc,eth,doge from wallet using a join
+// app.get('wallet/balances',(req,res)=>{
+
+// })
+
+//Creating orders:
+
+app.post("/order/create", (req, res) => {
+    
+    const { user_id, side, price, volume, buyCur, sellCur } = req.body;
+    // res.status(200).json({ user: user_id, side: side, price: price, volume: volume, currency_buy: buyCur, currency_sell: sellCur });
+
+
+    const order_insertion = "INSERT INTO ORDERS (user_id,side,price,volume,buyCur,sellCur) VALUES (?,?,?,?,?,?)";
+
+    conn.query(order_insertion,[user_id,side,price,volume,buyCur,sellCur],(err,result)=>{
+        if(err)
+        {
+            console.log("Unable to initiate order");
+            res.status(500).json({message:"Error: Order Not placed"});
+            return;
+        }
+
+        console.log("Order placed Pending waiting for approval");
+        
+        res.status(200).json({Status:"Success",message:"Successfuly placed order",Payload:{
+            id:result.insertId,
+            side:side,
+            price:price,
+            Volime:volume,
+            state:"Pending",
+            buy_currency:buyCur,
+            sellCur:sellCur,
+        
+        }})
+    })
+
+
+
+});
+
+//Cancelling Orders:
+app.put("/order/cancel",(req,res)=>{
+    const {order_id} = req.body;
+
+    const delete_query = 'UPDATE ORDERS SET STATE = "Cancelled" where order_id = ? AND State = "pending"' ;
+   
+    conn.query(delete_query,[order_id],(err,result)=>{
+        if(err)
+        {
+            console.log("Unable to cancel order: ",order_id);
+            res.status(500).json({message:"Unable to Cance order ",order_id});
+            return;
+        }
+
+        if (result.affectedRows === 0) {
+            console.log("Order not found or already cancelled:", order_id);
+            res.status(404).json({ message: "Order not found or already cancelled", order_id });
+            return;
+        }
+
+        console.log("Order Succesfuly cancelled");
+        res.status(200).json({status:"Success",message:"Succesfuly cancelled",Payload:""});
+
+    })
+})
 
 app.listen(9090,()=>{
     console.log("Test");
