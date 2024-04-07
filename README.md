@@ -30,3 +30,12 @@ Cancelling an Order:
 ```bash
 curl -X PUT -H "Content-Type: application/json" -d '{"order_id":1}' 192.168.0.103:9090/order/cancel
 ```
+
+
+Admin API to Approve or decline transactions:
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"order_id":10}' localhost:9090/admin/check
+
+{"status":"Success","mesage":"Successfuly Sold Crypto from wallet"}
+```
+

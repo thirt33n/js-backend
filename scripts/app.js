@@ -191,7 +191,7 @@ app.post("/order/create", (req, res) => {
             id:result.insertId,
             side:side,
             price:price,
-            Volime:volume,
+            volume:volume,
             state:"Pending",
             buy_currency:buyCur,
             sellCur:sellCur,
@@ -232,11 +232,10 @@ app.put("/order/cancel",(req,res)=>{
 
 //ADMIN APIS
 
-//GET the values api
 
 //Success checking api:
 
-app.post("/admin/approve",(req,res)=>{
+app.post("/admin/check",(req,res)=>{
 
     const {order_id} = req.body;
 
@@ -267,6 +266,8 @@ app.post("/admin/approve",(req,res)=>{
                 {
                     console.log("Error",err);
                     // res.status(500).json({message:"Error"})
+                    res.status(500).json({status:"fail",message:"Unable to credit crypto"});
+
                     return;
                 }
                 const curBal = bal_res[0].BALANCE;
@@ -283,18 +284,123 @@ app.post("/admin/approve",(req,res)=>{
                             }
 
                             console.log("Wallet Updated");
-                            res.status(200).json({status:"Success",mesage:"Successfuly Added Crypto to wallet"});
+                            res.status(200).json({status:"Success",mesage:"Successfuly Added Crypto to wallet",payload:{
+                                    User:user_id,
+                                    balance:curBal-price,
+                            }});
                             
                         })
+
+                    //UPDATING ACCOUNT BALANCE
+                    const acc_bal_update = `UPDATE ACCOUNT SET BALANCE = ${curBal} - ? WHERE USER_ID = ?`;
+                    conn.query(acc_bal_update,[price,user_id],(err,acc_bal_res)=>{
+                        if(err)
+                        {
+                            console.log("Unable to complete sale",err);
+                            return;
+                        }
+                        console.log("Account Balance updated");
+                
+                    })
+
+                    //UPDATING THE ORDER
+                    const order_status_update = `UPDATE ORDERS SET STATE = "Success" where order_id = ?`;
+                    conn.query(order_status_update,[order_id],(err,or_up)=>{
+                        if(err){ console.log("Unable to update status: ",err); return;}
+                        console.log("Updated order status");
+                    })
                 }
 
                 if(curBal<price)
                 {
                     console.log("Insufficient funds");
                     res.status(403).json({status:"fail",message:"You have insufficient funds for this purchase"});
+                    
+                    const order_status_update = `UPDATE ORDERS SET STATE = "Cancel" where order_id = ?`;
+                    conn.query(order_status_update,[order_id],(err,or_up)=>{
+                        if(err){ console.log("Unable to update status: ",err); return;}
+                        console.log("Updated order status");
+                    })
                     return;
                 }
             })
+        }
+
+        //Selling
+
+        if(side == "sell")
+        {
+            const check_balance_query = `SELECT ${buyCur} FROM WALLET WHERE USER_ID = ?`;
+            conn.query(check_balance_query,[user_id],(err,bal_res)=>{
+                if(err)
+                {
+                    console.log("Error",err);
+                    // res.status(500).json({message:"Error"})
+                    res.status(500).json({status:"fail",message:"Unable to credit crypto"});
+                    return;
+                }
+                console.log(bal_res);
+
+                const crypto_left = bal_res[0][buyCur];
+                const crypto = [buyCur];
+
+                if(crypto_left>vol) //Checking if the person has the balance to buy the volume
+                {
+                        const wallet_update = `UPDATE WALLET SET ${buyCur} = ${buyCur} - ? where user_id = ?`;
+                        conn.query(wallet_update,[vol,user_id],(err,wal_up)=>{
+                            if(err)
+                            {
+                                console.log("Unable to update wallet",err);
+                                res.status(500).json({status:"fail",message:"Unable to credit crypto"});
+                                return;
+                            }
+
+                            console.log("Wallet Updated");
+                            res.status(200).json({status:"Success",mesage:"Successfuly Sold Crypto from wallet",payload:{
+                                User: user_id,
+                                [crypto]:crypto_left-vol
+                            }});
+                            
+                        })
+
+                        //UPDATING THE ACCOUNT BALANCE
+                        const acc_bal_update = `UPDATE ACCOUNT SET BALANCE = BALANCE + ? WHERE USER_ID = ?`;
+                        conn.query(acc_bal_update,[price,user_id],(err,acc_bal_res)=>{
+                        if(err)
+                        {
+                            console.log("Unable to complete sale",err);
+                            return;
+                        }
+                        console.log("Account Balance updated");
+                
+                    })
+
+                    //UPDATING THE ORDER
+                    const order_status_update = `UPDATE ORDERS SET STATE = "Declined" where order_id = ?`;
+                    conn.query(order_status_update,[order_id],(err,or_up)=>{
+                        if(err){ console.log("Unable to update status: ",err); return;}
+                        console.log("Updated order status");
+                    })
+
+                }
+
+                if(crypto_left<vol)
+                {
+                    console.log("Insufficient coins");
+                    res.status(403).json({status:"fail",message:"You have insufficient coins for this sale"});
+                    
+                    const order_status_update = `UPDATE ORDERS SET STATE = "Cancel" where order_id = ?`;
+                    conn.query(order_status_update,[order_id],(err,or_up)=>{
+                        if(err){ console.log("Unable to update status: ",err); return;}
+                        console.log("Updated order status");
+                    })
+                    return;
+                }
+            })            
+
+
+
+
         }
 
 
